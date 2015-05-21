@@ -2,13 +2,14 @@ package react
 
 import (
 	"errors"
-	"fmt"
-	"github.com/olebedev/go-duktape"
+	"log"
+
+	"github.com/yinhm/v8worker"
 )
 
 type Pool struct {
 	size int
-	ch   chan *duktape.Context
+	ch   chan *vm
 }
 
 type Option struct {
@@ -34,10 +35,11 @@ func (opt *Option) Validate() error {
 
 func NewPool(opt *Option) (*Pool, error) {
 	pool := &Pool{size: opt.PoolSize}
-	pool.ch = make(chan *duktape.Context, opt.PoolSize)
+	pool.ch = make(chan *vm, opt.PoolSize)
 	for i := 0; i < pool.size; i++ {
 		vm, err := newVM(opt.Source, opt.GlobalObjectName)
 		if err != nil {
+			log.Println(err)
 			return nil, err
 		}
 		pool.ch <- vm
@@ -45,19 +47,39 @@ func NewPool(opt *Option) (*Pool, error) {
 	return pool, nil
 }
 
-func newVM(src []byte, objName string) (*duktape.Context, error) {
-	vm := duktape.NewContext()
-	source := fmt.Sprintf(`var %v = %v || {}, console = {log:print,warn:print,error:print,info:print}; `, objName, objName) + string(src)
-	if vm.PevalString(source) == 1 {
-		return nil, errors.New(vm.SafeToString(-1))
-	}
-	return vm, nil
-}
-
-func (pl *Pool) Get() *duktape.Context {
+func (pl *Pool) Get() *vm {
 	return <-pl.ch
 }
 
-func (pl *Pool) Put(vm *duktape.Context) {
+func (pl *Pool) Put(vm *vm) {
 	pl.ch <- vm
+}
+
+type vm struct {
+	worker *v8worker.Worker
+	ch     chan string
+}
+
+func (v *vm) callback(msg v8worker.Message) {
+	v.ch <- string(msg)
+}
+
+func newVM(src []byte, objName string) (*vm, error) {
+	vm := &vm{
+		ch: make(chan string, 1),
+	}
+	worker := v8worker.New(vm.callback)
+
+	// tpl := "var %v = %v || {};\n"
+	tpl := "var self = {};\n"
+	// source := fmt.Sprintf(tpl, objName, objName) + string(src)
+	source := tpl + string(src)
+	// log.Println(source)
+	err := worker.Load("reactbundle.js", source)
+	if err != nil {
+		return nil, err
+	}
+
+	vm.worker = worker
+	return vm, nil
 }

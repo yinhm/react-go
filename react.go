@@ -61,25 +61,28 @@ func (rc *React) RenderComponent(name string, params interface{}) (string, error
 	var js string
 	if params == nil {
 		js = fmt.Sprintf(`
-			%v.React.renderToString(
+			var msg = %v.React.renderToString(
 				%v.React.createFactory(%v.%v)()
-			)`, objName, objName, objName, name)
+			);
+            $send(msg);`, objName, objName, objName, name)
 	} else {
 		j, err := json.Marshal(params)
 		if err != nil {
 			return "", err
 		}
 		js = fmt.Sprintf(`
-			%v.React.renderToString(
+			var msg = %v.React.renderToString(
 				%v.React.createFactory(%v.%v)(%v)
-			)`, objName, objName, objName, name, string(j))
+			);
+            $send(msg);`, objName, objName, objName, name, string(j))
 	}
 
-	if vm.PevalString(js) == 1 {
-		return "", errors.New(vm.SafeToString(-1))
+	err := vm.worker.Load("react.js", js)
+	if err != nil {
+		return "", err
 	}
-	v := vm.SafeToString(-1)
-	vm.Pop()
+
+	v := <-vm.ch
 	return v, nil
 }
 
@@ -91,14 +94,17 @@ func (rc *React) RunScript(src string) (string, error) {
 
 	js := `
 	(function() {
-		return %v
+		var msg = %v
+        $send(msg);
 	})();
 	`
-	if vm.PevalString(fmt.Sprintf(js, src)) == 1 {
-		return "", errors.New(vm.SafeToString(-1))
+
+	err := vm.worker.Load("runscript.js", fmt.Sprintf(js, src))
+	if err != nil {
+		return "", err
 	}
-	ret := vm.SafeToString(-1)
-	vm.Pop()
+
+	ret := <-vm.ch
 	return ret, nil
 }
 
@@ -109,8 +115,9 @@ func (rc *React) Load(src []byte) error {
 		vm := rc.pool.Get()
 		defer rc.pool.Put(vm)
 
-		if vm.PevalString(string(src)) == 1 {
-			panic(vm.SafeToString(-1))
+		err := vm.worker.Load("reactload.js", string(src))
+		if err != nil {
+			panic("react.Load failed.")
 		}
 	}
 	return nil
