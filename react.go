@@ -44,7 +44,7 @@ func DefaultReactOption() *Option {
 	}
 	return &Option{
 		Source:           src,
-		PoolSize:         10,
+		PoolSize:         4,
 		GlobalObjectName: "self",
 	}
 }
