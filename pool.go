@@ -52,6 +52,11 @@ func (pl *Pool) Get() *vm {
 }
 
 func (pl *Pool) Put(vm *vm) {
+	select {
+	case <-vm.ch:
+	default:
+	}
+
 	pl.ch <- vm
 }
 
