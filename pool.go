@@ -3,11 +3,13 @@ package react
 import (
 	"errors"
 	"log"
+	"math"
 
 	"github.com/yinhm/v8worker"
 )
 
 type Pool struct {
+	opt  *Option
 	size int
 	ch   chan *vm
 }
@@ -18,6 +20,8 @@ type Option struct {
 	PoolSize int
 	// name for variable includes component objects. ex. "self"
 	GlobalObjectName string
+
+	MaxRender int
 }
 
 func (opt *Option) Validate() error {
@@ -34,7 +38,14 @@ func (opt *Option) Validate() error {
 }
 
 func NewPool(opt *Option) (*Pool, error) {
-	pool := &Pool{size: opt.PoolSize}
+	if opt.MaxRender == 0 {
+		opt.MaxRender = math.MaxInt32
+	}
+
+	pool := &Pool{
+		opt:  opt,
+		size: opt.PoolSize,
+	}
 	pool.ch = make(chan *vm, opt.PoolSize)
 	for i := 0; i < pool.size; i++ {
 		vm, err := newVM(opt.Source, opt.GlobalObjectName)
@@ -57,12 +68,24 @@ func (pl *Pool) Put(vm *vm) {
 	default:
 	}
 
+	vm.renderCount += 1
+	if vm.renderCount > pl.opt.MaxRender {
+		vm2, err := newVM(pl.opt.Source, pl.opt.GlobalObjectName)
+		if err == nil {
+			log.Println("-----------> respan new vm <-----------")
+			vm = vm2
+		}
+	}
+
 	pl.ch <- vm
 }
 
 type vm struct {
 	worker *v8worker.Worker
 	ch     chan string
+
+	// die after max render
+	renderCount int
 }
 
 func (v *vm) callback(msg v8worker.Message) {

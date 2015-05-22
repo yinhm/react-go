@@ -44,8 +44,9 @@ func DefaultReactOption() *Option {
 	}
 	return &Option{
 		Source:           src,
-		PoolSize:         4,
+		PoolSize:         1,
 		GlobalObjectName: "self",
+		MaxRender:        100,
 	}
 }
 
@@ -61,20 +62,18 @@ func (rc *React) RenderComponent(name string, params interface{}) (string, error
 	var js string
 	if params == nil {
 		js = fmt.Sprintf(`
-			var msg = %v.React.renderToString(
+			$send(%v.React.renderToString(
 				%v.React.createFactory(%v.%v)()
-			);
-            $send(msg);`, objName, objName, objName, name)
+			));`, objName, objName, objName, name)
 	} else {
 		j, err := json.Marshal(params)
 		if err != nil {
 			return "", err
 		}
 		js = fmt.Sprintf(`
-			var msg = %v.React.renderToString(
+			$send(%v.React.renderToString(
 				%v.React.createFactory(%v.%v)(%v)
-			);
-            $send(msg);`, objName, objName, objName, name, string(j))
+			));`, objName, objName, objName, name, string(j))
 	}
 
 	err := vm.worker.Load("react.js", js)
