@@ -72,7 +72,6 @@ func (pl *Pool) Put(vm *vm) {
 	if vm.renderCount > pl.opt.MaxRender {
 		vm2, err := newVM(pl.opt.Source, pl.opt.GlobalObjectName)
 		if err == nil {
-			log.Println("-----------> respan new vm <-----------")
 			vm = vm2
 		}
 	}
@@ -88,8 +87,8 @@ type vm struct {
 	renderCount int
 }
 
-func (v *vm) callback(msg v8worker.Message) {
-	v.ch <- string(msg)
+func (v *vm) callback(msg string) {
+	v.ch <- msg
 }
 
 func newVM(src []byte, objName string) (*vm, error) {

@@ -46,7 +46,7 @@ func DefaultReactOption() *Option {
 		Source:           src,
 		PoolSize:         1,
 		GlobalObjectName: "self",
-		MaxRender:        100,
+		MaxRender:        10000,
 	}
 }
 
