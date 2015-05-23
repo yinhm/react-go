@@ -65,8 +65,8 @@ type vm struct {
 	ch     chan string
 }
 
-func (v *vm) callback(msg v8worker.Message) {
-	v.ch <- string(msg)
+func (v *vm) callback(msg string) {
+	v.ch <- msg
 }
 
 func newVM(src []byte, objName string) (*vm, error) {
